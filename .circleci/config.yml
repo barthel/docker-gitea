@@ -1,0 +1,58 @@
+version: 2.1
+
+workflows:
+  version: 2.1
+  build_and_deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+          context:
+            - "github"
+            - "Docker Hub"
+
+commands:
+  setup:
+    steps:
+      - run:
+          name: Prepare for multi arch build (setup qemu)
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y qemu-user-static binfmt-support
+      - run:
+          name: Check versions
+          command: |
+            qemu-arm-static --version
+            qemu-aarch64-static --version
+            update-binfmts --version 
+      - run:
+          name: Create multi arch docker image builder
+          command: |
+            docker buildx create --name multi-arch-builder
+            docker buildx use multi-arch-builder
+            docker buildx inspect --bootstrap
+      - checkout
+
+jobs:
+  build:
+    machine: true
+    resource_class: large
+    steps:
+      - setup
+      - run:
+          name: Build docker image
+          command: |
+            echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin
+            TAG_NAME="${DOCKER_USER}/gitea"
+            if [ "${CIRCLE_TAG}" != "" ]; then
+              TAG_NAME+=":${CIRCLE_TAG}"
+            fi
+            docker buildx build \
+              --platform linux/arm/v6 \
+              --tag ${TAG_NAME} \
+              --build-arg GITEA_BASE_TAG=${CIRCLE_TAG:-latest} \
+              --build-arg BUILDKIT_MULTI_PLATFORM=1 \
+              --no-cache \
+              --progress=plain \
+              --push .
