@@ -52,6 +52,7 @@ jobs:
               --platform linux/arm/v6 \
               --tag ${TAG_NAME} \
               --build-arg GITEA_BASE_TAG=${CIRCLE_TAG:-latest} \
+              --build-arg CIRCLE_TAG=${CIRCLE_TAG:-latest} \
               --build-arg BUILDKIT_MULTI_PLATFORM=1 \
               --no-cache \
               --progress=plain \
